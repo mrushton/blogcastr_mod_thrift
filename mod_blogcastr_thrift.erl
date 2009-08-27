@@ -12,11 +12,13 @@
 
 -behavior(gen_mod).
 
+-export([start/2, stop/1, handle_function/2, create_user/2, destroy_user/1, get_user_password/1, change_user_password/2, create_pubsub_node/2, destroy_pubsub_node/2, subscribe_to_pubsub_node/3, unsubscribe_from_pubsub_node/4, publish_text_post_to_pubsub_node/3, publish_image_post_to_pubsub_node/3, create_muc_room/4, destroy_muc_room/1, get_num_muc_room_occupants/1, send_text_post_to_muc_room/3, send_image_post_to_muc_room/3, send_text_comment_to_muc_occupant/3, send_image_comment_to_user/3, add/2]).
+
 -include("ejabberd.hrl").
 -include("blogcastr_thrift.hrl").
 -include("blogcastr_types.hrl").
 
--export([start/2, stop/1, handle_function/2, create_user/2, get_user_password/1, create_node/2, delete_node/2, publish_text_item/3, add/2]).
+-record(muc_online_room, {name_host, pid}).
 
 %%thrift functions
 
@@ -35,13 +37,21 @@ create_user(Username, Password) ->
             1
     end.
 
-%%get users password
+%%destroy a user
+destroy_user(Username) ->
+    ok.
+
+%%get user's password
 get_user_password(Username) ->
     ?INFO_MSG("Getting user ~s's password", [Username]),
     ejabberd_auth:get_password(binary_to_list(Username), "blogcastr.com").
 
+%%change a user's password
+change_user_password(Username, Password) ->
+    ok.
+
 %%create a pubsub node 
-create_node(Username, Node) ->
+create_pubsub_node(Username, Node) ->
     ?INFO_MSG("Creating node ~s", [Node]),
     Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
     NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
@@ -57,7 +67,7 @@ create_node(Username, Node) ->
 
 %%TODO: not currently working
 %%destroy a pubsub node 
-delete_node(Username, Node) ->
+destroy_pubsub_node(Username, Node) ->
     ?INFO_MSG("Deleting node ~s", [Node]),
     Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
     NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
@@ -69,18 +79,114 @@ delete_node(Username, Node) ->
             1
     end.
 
-%%publish text item to a pubsub node 
-publish_text_item(Username, Node, Item) ->
-    ?INFO_MSG("Publishing text item \"~s\" to node ~s", [Item#textItem.text, Node]),
-    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
+%%subscribe to a pubsub node
+%%TODO return subid
+subscribe_to_pubsub_node(Username, Resource, Node) ->
+    ?INFO_MSG("User ~s@blogcastr.com/~s subscribing to node ~s", [Username, Resource, Node]),
+    %%MVR - subscribe_node takes a jid and a jid string
+    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", binary_to_list(Resource)),
+    JidList = binary_to_list(Username) ++ "@blogcastr.com" ++ binary_to_list(Resource),
     NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
-    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Item#textItem.id))}]}, {xmlelement, "date", [], [{xmlcdata, Item#textItem.date}]}, {xmlelement, "text", [], [{xmlcdata, Item#textItem.text}]}]}]) of
+   case mod_pubsub:subscribe_node("pubsub.blogcastr.com", NodeList, Jid, JidList) of 
         {result, _} ->
             0;
         {error, _} ->
-            ?ERROR_MSG("Error publishing text item \"~s\" to node ~s", [Item#textItem.text, Node]),
+            ?ERROR_MSG("Error user ~s@blogcastr.com/~s subscribing to node ~s", [Username, Resource, Node]),
+            1
+   end.
+
+%%unsubscribe from a pubsub node
+unsubscribe_from_pubsub_node(Username, Resource, Node, SubId) ->
+    ?INFO_MSG("User ~s@blogcastr.com/~s unsubscribing from node ~s", [Username, Resource, Node]),
+    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", binary_to_list(Resource)),
+    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
+    case mod_pubsub:unsubscribe_node("pubsub.blogcastr.com", NodeList, Jid, Jid, "") of 
+        {result, _} ->
+            0;
+        {error, _} ->
+            ?ERROR_MSG("Error user ~s@blogcastr.com/~s unsubscribing from node ~s", [Username, Resource, Node]),
             1
     end.
+
+%%publish text post to a pubsub node 
+publish_text_post_to_pubsub_node(Username, Node, Post) ->
+    ?INFO_MSG("Publishing text post ~s to node ~s", [Post#textPost.text, Node]),
+    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
+    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
+    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]) of
+        {result, _} ->
+            0;
+        {error, _} ->
+            ?ERROR_MSG("Error publishing text item ~s to node ~s", [Post#textPost.text, Node]),
+            1
+    end.
+
+%%publish image post to a pubsub node 
+publish_image_post_to_pubsub_node(Username, Node, Post) ->
+    ?INFO_MSG("Publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
+    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
+    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
+    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postImage">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}]}]) of
+        {result, _} ->
+            0;
+        {error, _} ->
+            ?ERROR_MSG("Error publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
+            1
+    end.
+
+%%TODO: why is room visibible in discovery and not after restart 
+%%create a muc room with the given title and subject
+create_muc_room(Username, Room, Title, Subject) ->
+    ?INFO_MSG("Creating muc room ~s", [Room]),
+    %%store room
+    Opts = [{title, binary_to_list(Title)}, {allow_change_subj, false}, {allow_query_users, false}, {allow_private_messages, true}, {allow_visitor_status, false}, {allow_visitor_nickchange, false}, {public, false}, {public_list, false}, {persistent, true}, {moderated, true}, {members_by_default, true}, {members_only, false}, {allow_user_invites, false}, {password_protected, false}, {captcha_protected, false}, {password, []}, {anonymous, false}, {logging, false}, {max_users, 200}, {affiliations, [{{binary_to_list(Username), "blogcastr.com", []}, owner}]}, {subject, binary_to_list(Subject)}, {subject_author, binary_to_list(Username)}],
+    mod_muc:store_room("conference.blogcastr.com", binary_to_list(Room), Opts),
+    %%start room
+    case mod_muc_room:start("conference.blogcastr.com", "blogcastr.com", {muc, muc, muc_admin, muc}, binary_to_list(Room), 0, none, Opts) of
+        {ok, Pid} ->
+            F = fun() ->
+                mnesia:write(#muc_online_room{name_host = {Room, "conference.blogcastr.com"}, pid = Pid})
+            end,
+            mnesia:transaction(F),
+            0;
+        _ ->
+            ?INFO_MSG("Error creating muc room ~s", [Room]),
+            1
+    end.
+
+destroy_muc_room(Room) ->
+    ok.
+
+get_num_muc_room_occupants(Room) ->
+    ok.
+
+%%send text post to a muc room
+%%TODO: currently need to pass resource of a logged in user, just using dashboard for now
+send_text_post_to_muc_room(Username, Room, Post) ->
+    ?INFO_MSG("Sending text post to muc room ~s from ~s", [Room, Username]),
+    UsernameList = binary_to_list(Username),
+    RoomList = binary_to_list(Room),
+    ToJid = jlib:make_jid(RoomList, "conference.blogcastr.com", ""),
+    FromJid = jlib:make_jid(UsernameList, "blogcastr.com", "dashboard"),
+    %%could also route using mod_muc_room:route/4 which would be faster
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]}), 
+    0.
+
+send_image_post_to_muc_room(Username, Room, Post) ->
+    ok.
+
+%%send text comment to a muc occupant
+send_text_comment_to_muc_occupant(To, From, Comment) ->
+    ?INFO_MSG("Sending text comment to ~s from ~s", [To, From]),
+    ToJid = jlib:string_to_jid(binary_to_list(To)),
+    FromJid = jlib:string_to_jid(binary_to_list(From)),
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", To}, {"from", From}, {"type", "chat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"commentText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.id))}]}, {xmlelement, "date", [], [{xmlcdata, Comment#textComment.date}]}, {xmlelement, "text", [], [{xmlcdata, Comment#textComment.text}]}]}]}), 
+    0.
+
+%%send image comment to user
+send_image_comment_to_user(To, From, Comment) ->
+    ?INFO_MSG("Sending image comment to ~s from ~s", [To, From]),
+    0.
 
 %%simple test function
 add(X, Y) ->
