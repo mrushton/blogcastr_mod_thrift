@@ -172,8 +172,16 @@ send_text_post_to_muc_room(Username, Room, Post) ->
     ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]}), 
     0.
 
+%%send image post to a muc room
+%%TODO: currently need to pass resource of a logged in user, just using dashboard for now
 send_image_post_to_muc_room(Username, Room, Post) ->
-    ok.
+    ?INFO_MSG("Sending image post to muc room ~s from ~s", [Room, Username]),
+    UsernameList = binary_to_list(Username),
+    RoomList = binary_to_list(Room),
+    ToJid = jlib:make_jid(RoomList, "conference.blogcastr.com", ""),
+    FromJid = jlib:make_jid(UsernameList, "blogcastr.com", "dashboard"),
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"postImage">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}]}]}), 
+    0.
 
 %%send text comment to a muc occupant
 send_text_comment_to_muc_occupant(To, From, Comment) ->
