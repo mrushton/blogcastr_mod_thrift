@@ -85,7 +85,7 @@ subscribe_to_pubsub_node(Username, Resource, Node) ->
     ?INFO_MSG("User ~s@blogcastr.com/~s subscribing to node ~s", [Username, Resource, Node]),
     %%MVR - subscribe_node takes a jid and a jid string
     Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", binary_to_list(Resource)),
-    JidList = binary_to_list(Username) ++ "@blogcastr.com" ++ binary_to_list(Resource),
+    JidList = binary_to_list(Username) ++ "@blogcastr.com/" ++ binary_to_list(Resource),
     NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
    case mod_pubsub:subscribe_node("pubsub.blogcastr.com", NodeList, Jid, JidList) of 
         {result, _} ->
