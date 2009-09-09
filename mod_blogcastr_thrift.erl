@@ -12,13 +12,18 @@
 
 -behavior(gen_mod).
 
--export([start/2, stop/1, handle_function/2, create_user/2, destroy_user/1, get_user_password/1, change_user_password/2, create_pubsub_node/2, destroy_pubsub_node/2, subscribe_to_pubsub_node/3, unsubscribe_from_pubsub_node/4, publish_text_post_to_pubsub_node/3, publish_image_post_to_pubsub_node/3, create_muc_room/4, destroy_muc_room/1, get_num_muc_room_occupants/1, send_text_post_to_muc_room/3, send_image_post_to_muc_room/3, send_text_comment_to_muc_occupant/3, send_image_comment_to_user/3, add/2]).
+-export([start/2, stop/1, handle_function/2, create_user/2, destroy_user/1, get_user_password/1, change_user_password/2, create_pubsub_node/2, destroy_pubsub_node/2, subscribe_to_pubsub_node/3, unsubscribe_from_pubsub_node/4, publish_text_post_to_pubsub_node/4, create_muc_room/4, destroy_muc_room/1, get_num_muc_room_occupants/1, send_text_post_to_muc_room/4, send_image_post_to_muc_room/4, send_text_comment_post_to_muc_room/6, send_text_comment_to_muc_occupant/4, add/2]).
 
 -include("ejabberd.hrl").
 -include("blogcastr_thrift.hrl").
 -include("blogcastr_types.hrl").
 
 -record(muc_online_room, {name_host, pid}).
+
+%%helper functions
+
+user_to_xmlelement(User) ->
+    {xmlelement, "user", [], [{xmlelement, "name", [], [{xmlcdata, User#user.name}]}, {xmlelement, "account", [], [{xmlcdata, User#user.account}]}, {xmlelement, "url", [], [{xmlcdata, User#user.url}]}, {xmlelement, "avatar_url", [], [{xmlcdata, User#user.avatar_url}]}]}.
 
 %%thrift functions
 
@@ -46,7 +51,7 @@ get_user_password(Username) ->
     ?INFO_MSG("Getting user ~s's password", [Username]),
     ejabberd_auth:get_password(binary_to_list(Username), "blogcastr.com").
 
-%%change a user's password
+%%TODO: change a user's password
 change_user_password(Username, Password) ->
     ok.
 
@@ -109,11 +114,11 @@ unsubscribe_from_pubsub_node(Username, Resource, Node, SubId) ->
     end.
 
 %%publish text post to a pubsub node 
-publish_text_post_to_pubsub_node(Username, Node, Post) ->
+publish_text_post_to_pubsub_node(Username, Node, From, Post) ->
     ?INFO_MSG("Publishing text post ~s to node ~s", [Post#textPost.text, Node]),
     Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
     NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
-    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]) of
+    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, Post#textPost.timestamp}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]) of
         {result, _} ->
             0;
         {error, _} ->
@@ -122,19 +127,19 @@ publish_text_post_to_pubsub_node(Username, Node, Post) ->
     end.
 
 %%publish image post to a pubsub node 
-publish_image_post_to_pubsub_node(Username, Node, Post) ->
-    ?INFO_MSG("Publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
-    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
-    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
-    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postImage">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}]}]) of
-        {result, _} ->
-            0;
-        {error, _} ->
-            ?ERROR_MSG("Error publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
-            1
-    end.
+%publish_image_post_to_pubsub_node(Username, Node, Post) ->
+%    ?INFO_MSG("Publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
+%    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
+%    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
+%    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postImage">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, Post#imagePost.timestamp}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}]}]) of
+%        {result, _} ->
+%            0;
+%        {error, _} ->
+%            ?ERROR_MSG("Error publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
+%            1
+%    end.
 
-%%TODO: why is room visibible in discovery and not after restart 
+%%%TODO: why is room visibible in discovery and not after restart 
 %%create a muc room with the given title and subject
 create_muc_room(Username, Room, Title, Subject) ->
     ?INFO_MSG("Creating muc room ~s", [Room]),
@@ -162,38 +167,47 @@ get_num_muc_room_occupants(Room) ->
 
 %%send text post to a muc room
 %%TODO: currently need to pass resource of a logged in user, just using dashboard for now
-send_text_post_to_muc_room(Username, Room, Post) ->
+send_text_post_to_muc_room(Username, Room, From, Post) ->
     ?INFO_MSG("Sending text post to muc room ~s from ~s", [Room, Username]),
     UsernameList = binary_to_list(Username),
     RoomList = binary_to_list(Room),
     ToJid = jlib:make_jid(RoomList, "conference.blogcastr.com", ""),
     FromJid = jlib:make_jid(UsernameList, "blogcastr.com", "dashboard"),
     %%could also route using mod_muc_room:route/4 which would be faster
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]}), 
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"textPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.timestamp))}]}, {xmlelement, "medium", [], [{xmlcdata, Post#textPost.medium}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}, {xmlelement, "from", [], [user_to_xmlelement(From)]}]}]}), 
     0.
 
 %%send image post to a muc room
 %%TODO: currently need to pass resource of a logged in user, just using dashboard for now
-send_image_post_to_muc_room(Username, Room, Post) ->
+send_image_post_to_muc_room(Username, Room, From, Post) ->
     ?INFO_MSG("Sending image post to muc room ~s from ~s", [Room, Username]),
     UsernameList = binary_to_list(Username),
     RoomList = binary_to_list(Room),
     ToJid = jlib:make_jid(RoomList, "conference.blogcastr.com", ""),
     FromJid = jlib:make_jid(UsernameList, "blogcastr.com", "dashboard"),
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"postImage">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}]}]}), 
+    %%could also route using mod_muc_room:route/4 which would be faster
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"imagePost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.timestamp))}]}, {xmlelement, "medium", [], [{xmlcdata, Post#imagePost.medium}]}, {xmlelement, "image_url", [], [{xmlcdata, Post#imagePost.image_url}]}, {xmlelement, "from", [], [user_to_xmlelement(From)]}]}]}), 
     0.
 
-%%send text comment to a muc occupant
-send_text_comment_to_muc_occupant(To, From, Comment) ->
+%%send text comment post to a muc room
+%%TODO: currently need to pass resource of a logged in user, just using dashboard for now
+send_text_comment_post_to_muc_room(Username, Room, PostFrom, Post, CommentFrom, Comment) ->
+    ?INFO_MSG("Sending text comment post to muc room ~s from ~s", [Room, Username]),
+    UsernameList = binary_to_list(Username),
+    RoomList = binary_to_list(Room),
+    ToJid = jlib:make_jid(RoomList, "conference.blogcastr.com", ""),
+    FromJid = jlib:make_jid(UsernameList, "blogcastr.com", "dashboard"),
+    %%could also route using mod_muc_room:route/4 which would be faster
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference.blogcastr.com"}, {"from", UsernameList ++ "@blogcastr.com/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"commentPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#commentPost.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#commentPost.timestamp))}]}, {xmlelement, "medium", [], [{xmlcdata, Post#commentPost.medium}]}, {xmlelement, "from", [], [user_to_xmlelement(PostFrom)]}, {xmlelement, "comment", [], [{xmlelement, "type", [], [{xmlcdata, <<"textComment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.timestamp))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#textComment.text}]}, {xmlelement, "medium", [], [{xmlcdata, Comment#textComment.medium}]}, {xmlelement, "from", [], [user_to_xmlelement(CommentFrom)]}]}]}]}), 
+    0.
+
+%%send text comment post to a muc occupant
+send_text_comment_to_muc_occupant(To, From_Jid, From, Comment) ->
     ?INFO_MSG("Sending text comment to ~s from ~s", [To, From]),
     ToJid = jlib:string_to_jid(binary_to_list(To)),
-    FromJid = jlib:string_to_jid(binary_to_list(From)),
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", To}, {"from", From}, {"type", "chat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"commentText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.id))}]}, {xmlelement, "date", [], [{xmlcdata, Comment#textComment.date}]}, {xmlelement, "text", [], [{xmlcdata, Comment#textComment.text}]}]}]}), 
-    0.
-
-%%send image comment to user
-send_image_comment_to_user(To, From, Comment) ->
-    ?INFO_MSG("Sending image comment to ~s from ~s", [To, From]),
+    FromJid = jlib:string_to_jid(binary_to_list(From_Jid)),
+    %%TODO - better error checking
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", To}, {"from", From}, {"type", "chat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"textComment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#textComment.timestamp))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#textComment.text}]}, {xmlelement, "from", [], [{xmlelement, "user", [], [{xmlelement, "name", [], [{xmlcdata, From#user.name}]}, {xmlelement, "account", [], [{xmlcdata, From#user.account}]}, {xmlelement, "url", [], [{xmlcdata, From#user.url}]}, {xmlelement, "avatar_url", [], [{xmlcdata, From#user.avatar_url}]}]}, {xmlelement, "medium", [], [{ xmlcdata, Comment#textComment.medium}]}]}]}]}),
     0.
 
 %%simple test function
