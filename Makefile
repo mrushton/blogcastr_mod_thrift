@@ -1,5 +1,5 @@
 #########################################################
-# Makefile: Makefile for mod_blogcastr_thrift.
+# Makefile: Makefile for mod_thrift.
 #
 # Author: Matt Rushton
 # Date: 8/11/09
@@ -12,14 +12,14 @@ EJABBERD_EBIN_DIR = /usr/lib/ejabberd/ebin/
 
 .PHONY = all clean install
 
-all: mod_blogcastr_thrift.beam
+all: mod_thrift.beam
 
 #AS DESIGNED: assume thrift files are properly generated
-mod_blogcastr_thrift.beam: mod_blogcastr_thrift.erl
-	erlc -I ${THRIFT_DIR}/gen-erl/ -I ${EJABBERD_DIR}  mod_blogcastr_thrift.erl
+mod_thrift.beam: mod_thrift.erl
+	erlc -I ${THRIFT_DIR}/gen-erl/ -I ${EJABBERD_DIR}  mod_thrift.erl
 
-install: mod_blogcastr_thrift.beam
-	sudo cp mod_blogcastr_thrift.beam ${EJABBERD_EBIN_DIR}
+install: mod_thrift.beam
+	sudo cp mod_thrift.beam ${EJABBERD_EBIN_DIR}
 
 clean:
-	rm -rf mod_blogcastr_thrift.beam
+	rm -rf mod_thrift.beam
