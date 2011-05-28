@@ -7,7 +7,8 @@
 #########################################################
 
 THRIFT_DIR = ../../thrift/
-EJABBERD_DIR = /home/mrushton/tmp/ejabberd-modules/trunk/src/
+#EJABBERD_DIR = /home/mrushton/tmp/ejabberd-modules/trunk/src/
+EJABBERD_DIR = ../../vendor/ejabberd-2.1.4/src
 EJABBERD_EBIN_DIR = /usr/lib/ejabberd/ebin/
 
 .PHONY = all clean install
