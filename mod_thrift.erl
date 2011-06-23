@@ -12,7 +12,7 @@
 
 -behavior(gen_mod).
 
--export([start/2, stop/1, handle_function/2, create_user/3, destroy_user/1, get_user_password/2, change_user_password/2, create_pubsub_node/2, destroy_pubsub_node/2, subscribe_to_pubsub_node/3, unsubscribe_from_pubsub_node/4, publish_text_post_to_pubsub_node/4, create_muc_room/5, destroy_muc_room/1, get_num_muc_room_occupants/1, send_text_post_to_muc_room/5, send_image_post_to_muc_room/5, send_audio_post_to_muc_room/5, send_audio_media_to_muc_room/4, send_comment_post_to_muc_room/7, send_comment_to_muc_room/5, send_comment_to_muc_occupant/4, add/2]).
+-export([start/2, stop/1, handle_function/2, create_user/3, destroy_user/1, get_user_password/2, change_user_password/2, create_muc_room/5, destroy_muc_room/1, get_num_muc_room_occupants/1, send_text_post_to_muc_room/5, send_image_post_to_muc_room/5, send_audio_post_to_muc_room/5, send_audio_media_to_muc_room/4, send_comment_post_to_muc_room/7, send_comment_to_muc_room/5, send_comment_to_muc_occupant/4, add/2]).
 
 -include("ejabberd.hrl").
 -include("blogcastr_thrift.hrl").
@@ -113,19 +113,6 @@ unsubscribe_from_pubsub_node(Username, Resource, Node, SubId) ->
             1
     end.
 
-%%publish text post to a pubsub node 
-publish_text_post_to_pubsub_node(Username, Node, From, Post) ->
-    ?INFO_MSG("Publishing text post ~s to node ~s", [Post#textPost.text, Node]),
-    Jid = jlib:make_jid(binary_to_list(Username), "blogcastr.com", ""),
-    NodeList = mod_pubsub:string_to_node(binary_to_list(Node)),
-    case mod_pubsub:publish_item("pubsub.blogcastr.com", "blogcastr.com", NodeList, Jid, "", [{xmlelement, "event", [{"xmlns", "http://blogcastr.com"}], [{xmlelement, "type", [], [{xmlcdata, <<"postText">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, Post#textPost.timestamp}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}]}]) of
-        {result, _} ->
-            0;
-        {error, _} ->
-            ?ERROR_MSG("Error publishing text item ~s to node ~s", [Post#textPost.text, Node]),
-            1
-    end.
-
 %%publish image post to a pubsub node 
 %publish_image_post_to_pubsub_node(Username, Node, Post) ->
 %    ?INFO_MSG("Publishing image post ~s to node ~s", [Post#imagePost.image_url, Node]),
@@ -180,7 +167,7 @@ send_text_post_to_muc_room(Username, Server, Room, From, Post) ->
     ToJid = jlib:make_jid(RoomList, "conference." ++ ServerList, ""),
     FromJid = jlib:make_jid(UsernameList, ServerList, "dashboard"),
     %%could also route using mod_muc_room:route/4 which would be faster
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"TextPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.timestamp))}]}, {xmlelement, "from", [], [{xmlcdata, Post#textPost.from}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}, user_to_xmlelement(From)]}]}), 
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"TextPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Post#textPost.created_at}]}, {xmlelement, "from", [], [{xmlcdata, Post#textPost.from}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}, user_to_xmlelement(From)]}]}), 
     %%ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"TextPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#textPost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#textPost.timestamp))}]}, {xmlelement, "from", [], [{xmlcdata, Post#textPost.from}]}, {xmlelement, "text", [], [{xmlcdata, Post#textPost.text}]}, {xmlelement, "from", [], [user_to_xmlelement(From)]}]}]}), 
     0.
 
@@ -198,10 +185,10 @@ send_image_post_to_muc_room(Username, Server, Room, From, Post) ->
     case Post#imagePost.text of
       undefined ->
             ?ERROR_MSG("Image post to muc room without text?", []),
-        ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"ImagePost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.timestamp))}]}, {xmlelement, "from", [], [{xmlcdata, Post#imagePost.from}]}, {xmlelement, "image-url", [], [{xmlcdata, Post#imagePost.image_url}]}, {xmlelement, "image-width", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_width))}]}, {xmlelement, "image-height", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_height))}]}, user_to_xmlelement(From)]}]});
+        ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"ImagePost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Post#imagePost.created_at}]}, {xmlelement, "from", [], [{xmlcdata, Post#imagePost.from}]}, {xmlelement, "image-url", [], [{xmlcdata, Post#imagePost.image_url}]}, {xmlelement, "image-width", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_width))}]}, {xmlelement, "image-height", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_height))}]}, user_to_xmlelement(From)]}]});
       _ ->
             ?ERROR_MSG("Image post to muc room with text?", []),
-        ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"ImagePost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#imagePost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.timestamp))}]}, {xmlelement, "from", [], [{xmlcdata, Post#imagePost.from}]}, {xmlelement, "image-url", [], [{xmlcdata, Post#imagePost.image_url}]}, {xmlelement, "text", [], [{xmlcdata, Post#imagePost.text}]}, {xmlelement, "image-width", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_width))}]}, {xmlelement, "image-height", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_height))}]}, user_to_xmlelement(From)]}]})
+        ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"ImagePost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Post#imagePost.created_at}]}, {xmlelement, "from", [], [{xmlcdata, Post#imagePost.from}]}, {xmlelement, "image-url", [], [{xmlcdata, Post#imagePost.image_url}]}, {xmlelement, "text", [], [{xmlcdata, Post#imagePost.text}]}, {xmlelement, "image-width", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_width))}]}, {xmlelement, "image-height", [], [{xmlcdata, list_to_binary(integer_to_list(Post#imagePost.image_height))}]}, user_to_xmlelement(From)]}]})
    end,
    0.
 
@@ -259,7 +246,7 @@ send_comment_post_to_muc_room(Username, Server, Room, PostFrom, Post, CommentFro
     ToJid = jlib:make_jid(RoomList, "conference." ++ ServerList, ""),
     FromJid = jlib:make_jid(UsernameList, ServerList, "dashboard"),
     %%could also route using mod_muc_room:route/4 which would be faster
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference" ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"commentPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#commentPost.id))}]}, {xmlelement, "date", [], [{xmlcdata, Post#commentPost.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Post#commentPost.timestamp))}]}, {xmlelement, "from", [], [{xmlcdata, Post#commentPost.from}]}, {xmlelement, "from", [], [user_to_xmlelement(PostFrom)]}, {xmlelement, "comment", [], [{xmlelement, "type", [], [{xmlcdata, <<"comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "date", [], [{xmlcdata, Comment#comment.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.timestamp))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, {xmlelement, "from", [], [{xmlcdata, Comment#comment.from}]}, {xmlelement, "from", [], [user_to_xmlelement(CommentFrom)]}]}]}]}), 
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference" ++ ServerList}, {"from", UsernameList ++ "@" ++ ServerList ++ "/dashboard"}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"CommentPost">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Post#commentPost.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Post#commentPost.created_at}]}, {xmlelement, "from", [], [{xmlcdata, Post#commentPost.from}]}, user_to_xmlelement(PostFrom), {xmlelement, "comment", [], [{xmlelement, "type", [], [{xmlcdata, <<"Comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Comment#comment.created_at}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, {xmlelement, "from", [], [{xmlcdata, Comment#comment.from}]}, user_to_xmlelement(CommentFrom)]}]}]}), 
     0.
 
 %%send comment to a muc room, replacing muc occupant version 
@@ -270,7 +257,7 @@ send_comment_to_muc_room(Room, Server, From_Jid, From, Comment) ->
     ToJid = jlib:make_jid(RoomList, "conference." ++ ServerList, ""),
     FromJid = jlib:string_to_jid(binary_to_list(From_Jid)),
     %%TODO - better error checking
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", binary_to_list(From_Jid)}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "date", [], [{xmlcdata, Comment#comment.date}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.timestamp))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, {xmlelement, "from", [], [user_to_xmlelement(From)]}]}]}), 
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", RoomList ++ "@conference." ++ ServerList}, {"from", binary_to_list(From_Jid)}, {"type", "groupchat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"Comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "created-at", [], [{xmlcdata, Comment#comment.created_at}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, user_to_xmlelement(From)]}]}), 
     0.
 
 %%send text comment post to a muc occupant
@@ -279,7 +266,7 @@ send_comment_to_muc_occupant(To, From_Jid, From, Comment) ->
     ToJid = jlib:string_to_jid(binary_to_list(To)),
     FromJid = jlib:string_to_jid(binary_to_list(From_Jid)),
     %%TODO - better error checking
-    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", To}, {"from", From}, {"type", "chat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "timestamp", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.timestamp))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, {xmlelement, "from", [], [{xmlelement, "user", [], [{xmlelement, "username", [], [{xmlcdata, From#user.username}]}, {xmlelement, "type", [], [{xmlcdata, From#user.type}]}, {xmlelement, "url", [], [{xmlcdata, From#user.url}]}, {xmlelement, "avatar_url", [], [{xmlcdata, From#user.avatar_url}]}]}, {xmlelement, "from", [], [{ xmlcdata, Comment#comment.from}]}]}]}]}),
+    ejabberd_router:route(FromJid, ToJid, {xmlelement, "message", [{"to", To}, {"from", From}, {"type", "chat"}], [{xmlelement, "body", [], [{xmlelement, "type", [], [{xmlcdata, <<"comment">>}]}, {xmlelement, "id", [], [{xmlcdata, list_to_binary(integer_to_list(Comment#comment.id))}]}, {xmlelement, "text", [], [{xmlcdata, Comment#comment.text}]}, {xmlelement, "from", [], [{xmlelement, "user", [], [{xmlelement, "username", [], [{xmlcdata, From#user.username}]}, {xmlelement, "type", [], [{xmlcdata, From#user.type}]}, {xmlelement, "url", [], [{xmlcdata, From#user.url}]}, {xmlelement, "avatar_url", [], [{xmlcdata, From#user.avatar_url}]}]}, {xmlelement, "from", [], [{ xmlcdata, Comment#comment.from}]}]}]}]}),
     0.
 
 %%simple test function
